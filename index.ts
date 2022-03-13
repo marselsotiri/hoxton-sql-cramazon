@@ -58,4 +58,79 @@ app.get('/users/:email', async (req, res) => {
   }
 });
 
+app.post('/orders', async (req, res) => {
+  const { email, title, quantity } = req.body;
+  try {
+    const user = await prisma.user.update({
+      where: { email },
+      data: { orders: { create: { quantity, item: { connect: { title } } } } },
+      include: { orders: { select: { quantity: true, id: true, item: true } } }
+    });
+    res.send(user);
+  } catch (error) {
+    //@ts-ignore
+    res.status(400).send({ error: error.message });
+  }
+});
+// - Create a new item
+
+app.post('/items', async (req, res) => {
+  const { title, image, price } = req.body;
+  try {
+    const item = await prisma.item.create({ data: { title, image, price} });
+    res.send(item);
+  } catch (error) {
+    //@ts-ignore
+    res.status(400).send({ error: error.message });
+  }
+});
+
+app.patch('/users/:email', async (req, res) => {
+  const currentEmail = req.params.email;
+  const { name, email } = req.body;
+  try {
+    let user = await prisma.user.findUnique({ where: { email: currentEmail } });
+    if (user) {
+      user = await prisma.user.update({
+        where: { email: currentEmail },
+        data: { email: email ?? user.email, name: name ?? user.name },
+        include: {
+          orders: { select: { quantity: true, id: true, item: true } }
+        }
+      });
+      res.send(user);
+    } else res.status(404).send({ error: 'User not found' });
+  } catch (error) {
+    //@ts-ignore
+    res.status(400).send({ error: error.message });
+  }
+});
+
+app.delete('/orders/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  const { email } = req.body;
+  try {
+    const order = await prisma.order.findUnique({ where: { id } });
+    let user = await prisma.user.findUnique({
+      where: { email },
+      include: { orders: { select: { quantity: true, id: true, item: true } } }
+    });
+    if (order && user && order.userId === user.id) {
+      await prisma.order.delete({ where: { id } });
+      user = await prisma.user.findUnique({
+        where: { email },
+        include: {
+          orders: { select: { quantity: true, id: true, item: true } }
+        }
+      });
+      res.send(user);
+    } else {
+      res.status(404).send({ error: 'This order does not exist!' });
+    }
+  } catch (error) {
+    //@ts-ignore
+    res.status(400).send({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server up: http://localhost:${PORT}`));

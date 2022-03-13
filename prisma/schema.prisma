@@ -21,6 +21,7 @@ model Item {
   id     Int     @id @default(autoincrement())
   title  String  @unique
   image  String
+  price  Float
   orders Order[]
 }
 
